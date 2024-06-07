@@ -15,18 +15,18 @@ function getRandomProduct($client) {
 
     $crawler = new Crawler($html);
     $products = $crawler->filter('.manhattan--container--1lP57Ag');
-    
+
     if ($products->count() == 0) {
         return null;
     }
-    
+
     $randomIndex = rand(0, $products->count() - 1);
     $product = $products->eq($randomIndex);
-    
+
     $productLink = "https:" . $product->filter('a')->attr('href');
-    $productTitle = $product->filter('h1')->text();
-    $productPrice = $product->filter('.manhattan--price--2hbO9a')->text();
-    
+    $productTitle = $product->filter('.manhattan--titleText--1hp21')->text();
+    $productPrice = $product->filter('.manhattan--price-sale--1CCSZ')->text();
+
     return [
         'title' => $productTitle,
         'link' => $productLink,
@@ -53,7 +53,7 @@ $product = getRandomProduct($client);
 if ($product) {
     $message = "*{$product['title']}*\n\nPrice: {$product['price']}\n[Buy Now]({$product['link']})";
     $response = sendMessage($client, $botToken, $chatId, $message);
-    echo $response->getBody();
+    echo "Message sent: " . $response->getBody();
 } else {
     echo "No products found.";
 }
