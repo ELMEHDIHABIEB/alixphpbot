@@ -1,41 +1,50 @@
-import os
 import requests
 from bs4 import BeautifulSoup
-import random
+from telegram import Bot
+import os
 
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+# Get the bot token and channel ID from environment variables
+BOT_TOKEN = os.environ['BOT_TOKEN']
+CHANNEL_ID = os.environ['CHANNEL_ID']  # Replace with your channel ID
 
-def get_random_product():
-    url = "https://www.aliexpress.com/wholesale?catId=0&initiative_id=SB_20220101000000&SearchText=smartphone"
+bot = Bot(token=BOT_TOKEN)
+
+def scrape_aliexpress():
+    url = 'https://www.aliexpress.com/wholesale?catId=0&initiative_id=SB_20210608052432&SearchText=your+search+term'
     response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    products = soup.find_all('a', class_='manhattan--container--1lP57Ag cards--gallery--2o6yJVt')
-    random_product = random.choice(products)
-    
-    product_link = "https:" + random_product['href']
-    product_title = random_product.find('h1', class_='manhattan--titleText--WccSjUS').text
-    product_image = random_product.find('img')['src']
-    
-    return product_title, product_link, product_image
+    if response.status_code != 200:
+        print(f"Error fetching the URL: {response.status_code}")
+        return []
 
-def send_message(product_title, product_link, product_image):
-    message = f"*{product_title}*\n\nCheck it out [here]({product_link})!\n\n![Product Image]({product_image})"
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
-        'text': message,
-        'parse_mode': 'Markdown'
-    }
-    response = requests.post(url, data=payload)
-    return response.json()
+    soup = BeautifulSoup(response.content, 'html.parser')
+    
+    products = []
 
-def main():
-    print("Sending test message...")
-    product_title, product_link, product_image = get_random_product()
-    response = send_message(product_title, product_link, product_image)
-    print("Message sent:", response)
+    for item in soup.select('.item'):  # Adjust the selector to match the AliExpress HTML structure
+        title = item.select_one('.item-title')
+        price = item.select_one('.price')
+        image = item.select_one('.item-img img')
+        
+        if title and price and image:
+            products.append({
+                'title': title.get_text(strip=True),
+                'price': price.get_text(strip=True),
+                'image_url': image['src']
+            })
+
+    if not products:
+        print("No products found.")
+    return products
+
+def post_to_channel():
+    products = scrape_aliexpress()
+    
+    for product in products:
+        message = f"Title: {product['title']}\nPrice: {product['price']}\n"
+        print(f"Posting: {message}")
+        bot.send_photo(chat_id=CHANNEL_ID, photo=product['image_url'], caption=message)
 
 if __name__ == "__main__":
-    main()
+    print("Bot started.")
+    post_to_channel()
+    print("Bot finished.")
